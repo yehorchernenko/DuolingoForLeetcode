@@ -18,7 +18,7 @@ Cards come in two kinds:
 - **Review due / Mixed practice / Fix mistakes** modes.
 - **Cheat sheet** for each unit, for fast skimming before an interview.
 - **Keyboard-first**: `1`–`9` pick, `Enter` check/continue, `Space` reveal, `Esc` quit.
-- **Export/import** progress as JSON (Settings ⚙️) to back up or move between devices.
+- **Export/import** progress as JSON (Settings ⚙️: copy the text or download a file) to back up or move between devices.
 - Dark mode follows your OS.
 
 ## Run it

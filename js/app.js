@@ -215,7 +215,7 @@
     app.innerHTML = `
       <section class="lesson">
         <div class="lesson-top">
-          <button class="icon-btn" data-act="quit" title="Quit lesson (Esc)">✕</button>
+          <button class="icon-btn" data-act="quit" title="Quit lesson (Esc). Answers so far are saved.">✕</button>
           <div class="bar big"><div style="width:${pct}%"></div></div>
         </div>
         <p class="tag">${unit.icon} ${esc(unit.title)}${item.retry ? ' · <span class="retry">Try again</span>' : ""}${!prog(c.id) ? ' · <span class="new">New</span>' : ""}</p>
@@ -408,9 +408,19 @@
         <h2>Your data</h2>
         <p class="muted">Progress lives only in this browser's localStorage. Export it to back up or move to another device.</p>
         <div class="row">
-          <button class="btn" data-act="export">Export JSON</button>
-          <label class="btn">Import JSON<input type="file" accept="application/json" id="import" hidden></label>
+          <button class="btn" data-act="export">Export</button>
+          <label class="btn">Import file<input type="file" accept="application/json,.json" id="import" hidden></label>
           <button class="btn bad" data-act="reset">Reset all progress</button>
+        </div>
+        <p id="data-msg" class="small" role="status"></p>
+        <div id="export-box" hidden>
+          <p class="small muted">Copy this text and keep it somewhere safe. To restore, paste it back here and press Load.</p>
+          <textarea id="export-text" rows="6" spellcheck="false"></textarea>
+          <div class="row">
+            <button class="btn" data-act="copy">Copy</button>
+            ${window.self === window.top ? '<button class="btn" data-act="download">Download file</button>' : ""}
+            <button class="btn" data-act="load">Load pasted text</button>
+          </div>
         </div>
         <h2>Keyboard</h2>
         <p class="muted"><kbd>1</kbd>–<kbd>9</kbd> pick option · <kbd>Enter</kbd> check / continue · <kbd>Space</kbd> reveal flashcard · <kbd>Esc</kbd> quit lesson</p>
@@ -430,31 +440,67 @@
     return `<h2>Last 12 weeks</h2><div class="heatmap">${cells.join("")}</div>`;
   }
 
+  function dataMsg(text, ok = true) {
+    const el = $("#data-msg");
+    if (el) { el.textContent = text; el.style.color = ok ? "var(--good)" : "var(--bad)"; }
+  }
+
   function exportData() {
+    $("#export-box").hidden = false;
+    const ta = $("#export-text");
+    ta.value = JSON.stringify(S);
+    ta.focus();
+    ta.select();
+  }
+
+  function copyExport() {
+    const ta = $("#export-text");
+    const fallback = () => { ta.focus(); ta.select(); dataMsg("Text selected. Press Ctrl/Cmd+C to copy."); };
+    try {
+      navigator.clipboard.writeText(ta.value).then(() => dataMsg("Copied to clipboard."), fallback);
+    } catch { fallback(); }
+  }
+
+  function downloadExport() {
     const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `leetcode-cards-progress-${dayKey()}.json`;
+    a.download = `leetlingo-progress-${dayKey()}.json`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function applyImport(txt) {
+    try {
+      const data = JSON.parse(txt);
+      if (typeof data !== "object" || !data || !data.cards) throw new Error("bad file");
+      S = Object.assign(defaultState(), data);
+      save();
+      renderSettings();
+      renderHeader();
+      dataMsg("Progress imported.");
+    } catch {
+      dataMsg("That doesn't look like exported progress. Paste the full text from Export.", false);
+    }
   }
 
   function importData(ev) {
     const file = ev.target.files[0];
-    if (!file) return;
-    file.text().then((txt) => {
-      try {
-        const data = JSON.parse(txt);
-        if (typeof data !== "object" || !data.cards) throw new Error("bad file");
-        S = Object.assign(defaultState(), data);
-        save();
-        alert("Progress imported!");
-        renderSettings();
-        renderHeader();
-      } catch {
-        alert("That file doesn't look like an exported progress file.");
-      }
-    });
+    if (file) file.text().then(applyImport);
+  }
+
+  let resetArmed = false;
+  function reset(btn) {
+    if (!resetArmed) {
+      resetArmed = true;
+      btn.textContent = "Click again to delete everything";
+      setTimeout(() => { resetArmed = false; if (btn.isConnected) btn.textContent = "Reset all progress"; }, 4000);
+      return;
+    }
+    resetArmed = false;
+    S = defaultState();
+    save();
+    renderHome();
   }
 
   // ---------- Events ----------
@@ -473,15 +519,14 @@
       case "reveal": reveal(); break;
       case "self": finishCard(el.dataset.v === "1"); break;
       case "next": next(); break;
-      case "quit": if (confirm("Quit this lesson? Answers so far are saved.")) renderHome(); break;
+      case "quit": renderHome(); break;
       case "again": lastLaunch ? launch(...lastLaunch) : renderHome(); break;
       case "goal": S.goal = +el.dataset.v; save(); renderSettings(); renderHeader(); break;
       case "export": exportData(); break;
-      case "reset":
-        if (confirm("Delete ALL progress (XP, streak, card history)? This cannot be undone.")) {
-          S = defaultState(); save(); renderHome();
-        }
-        break;
+      case "reset": reset(el); break;
+      case "copy": copyExport(); break;
+      case "download": downloadExport(); break;
+      case "load": applyImport($("#export-text").value); break;
     }
   });
 
