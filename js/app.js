@@ -17,6 +17,10 @@
   const CARDS = {};
   for (const u of UNITS) for (const c of u.cards) { c.unit = u.id; CARDS[c.id] = c; }
   const unitById = (id) => UNITS.find((u) => u.id === id);
+  const PROBLEMS = window.PROBLEMS || {};
+  const B75 = UNITS.filter((u) => u.track === "blind75");
+  const B75_NUMS = [...new Set(B75.flatMap((u) => u.cards.map((c) => c.p)))];
+  const solvedCount = () => B75_NUMS.filter((n) => S.solved[n]).length;
 
   // ---------- Storage ----------
   const defaultState = () => ({
@@ -28,6 +32,7 @@
     lastDay: null,   // "YYYY-MM-DD" of last activity
     days: {},        // "YYYY-MM-DD" -> xp earned that day
     goal: 50,
+    solved: {},      // LeetCode problem number -> "YYYY-MM-DD" marked solved
   });
 
   function load() {
@@ -108,6 +113,7 @@
   };
   const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   const fmt = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\n/g, "<br>");
+  const codeHtml = (src) => esc(src).replace("________", '<span class="blank">________</span>');
   const $ = (sel, root = document) => root.querySelector(sel);
   const app = $("#app");
 
@@ -157,26 +163,42 @@
         </div>
       </section>
       <section class="path">
-        ${UNITS.map((u, i) => {
-          const st = unitStats(u);
-          const pct = Math.round((st.mastered / st.total) * 100);
-          const started = st.seen > 0;
-          return `
+        ${renderUnits(UNITS.filter((u) => u.track !== "blind75"))}
+      </section>
+      ${B75.length ? `
+      <section class="track-head">
+        <h2>Blind 75</h2>
+        <p class="muted">The Medium and Hard problems from the Blind 75 list, 3 cards each: the approach, the key line of code, and the trap. Solve each one on LeetCode too, then tick it off.</p>
+        <div class="bar"><div style="width:${Math.round((solvedCount() / B75_NUMS.length) * 100)}%"></div></div>
+        <p class="small muted">${solvedCount()} / ${B75_NUMS.length} solved on LeetCode</p>
+      </section>
+      <section class="path">
+        ${renderUnits(B75)}
+      </section>` : ""}`;
+  }
+
+  function renderUnits(units) {
+    return units.map((u, i) => {
+      const st = unitStats(u);
+      const pct = Math.round((st.mastered / st.total) * 100);
+      const started = st.seen > 0;
+      const nums = [...new Set(u.cards.map((c) => c.p).filter(Boolean))];
+      const solved = nums.filter((n) => S.solved[n]).length;
+      return `
           <article class="unit ${pct === 100 ? "done" : ""}">
             <div class="unit-icon">${u.icon}</div>
             <div class="unit-body">
               <h2><span class="unit-num">${i + 1}</span> ${esc(u.title)}</h2>
               <p class="muted">${esc(u.desc)}</p>
               <div class="bar"><div style="width:${pct}%"></div></div>
-              <p class="small muted">${st.mastered}/${st.total} mastered · ${st.seen - st.mastered} learning${st.due ? ` · <b class="due">${st.due} due</b>` : ""}</p>
+              <p class="small muted">${st.mastered}/${st.total} mastered · ${st.seen - st.mastered} learning${st.due ? ` · <b class="due">${st.due} due</b>` : ""}${nums.length ? ` · ${solved}/${nums.length} solved` : ""}</p>
             </div>
             <div class="unit-actions">
               <button class="btn primary" data-act="unit" data-unit="${u.id}">${started ? "Continue" : "Start"}</button>
-              <button class="btn ghost small" data-act="sheet" data-unit="${u.id}">Cheat sheet</button>
+              <button class="btn ghost small" data-act="sheet" data-unit="${u.id}">${nums.length ? "Problems" : "Cheat sheet"}</button>
             </div>
           </article>`;
-        }).join("")}
-      </section>`;
+    }).join("");
   }
 
   // ---------- Lesson ----------
@@ -218,9 +240,9 @@
           <button class="icon-btn" data-act="quit" title="Quit lesson (Esc). Answers so far are saved.">✕</button>
           <div class="bar big"><div style="width:${pct}%"></div></div>
         </div>
-        <p class="tag">${unit.icon} ${esc(unit.title)}${item.retry ? ' · <span class="retry">Try again</span>' : ""}${!prog(c.id) ? ' · <span class="new">New</span>' : ""}</p>
+        <p class="tag">${unit.icon} ${esc(unit.title)}${c.p ? ` · ${problemLink(c.p)}` : ""}${item.retry ? ' · <span class="retry">Try again</span>' : ""}${!prog(c.id) ? ' · <span class="new">New</span>' : ""}</p>
         <h2 class="question">${fmt(c.q)}</h2>
-        ${c.c ? `<pre class="code"><code>${esc(c.c)}</code></pre>` : ""}
+        ${c.c ? `<pre class="code"><code>${codeHtml(c.c)}</code></pre>` : ""}
         ${isFlash ? `
           <div class="flash" id="flash">
             <p class="muted">Think of your answer, then reveal.</p>
@@ -237,6 +259,12 @@
           ? `<button class="btn primary wide" data-act="reveal">Show answer <kbd>Space</kbd></button>`
           : `<button class="btn primary wide" data-act="check" disabled>Check <kbd>Enter</kbd></button>`}
       </footer>`;
+  }
+
+  function problemLink(num) {
+    const pr = PROBLEMS[num];
+    if (!pr) return `#${num}`;
+    return `<a href="${pr.url}" target="_blank" rel="noopener" class="lc-link">#${num} ${esc(pr.title)} ↗</a>`;
   }
 
   function pick(i) {
@@ -352,6 +380,10 @@
       startLesson(pickLesson(shuffle(pool)), "Mixed practice");
     },
     mistakes: () => startLesson(shuffle(mistakeIds()).slice(0, LESSON_SIZE), "Fix mistakes"),
+    problem: (num) => {
+      const ids = allIds().filter((id) => CARDS[id].p === +num);
+      startLesson(shuffle(ids), `#${num} ${PROBLEMS[num] ? PROBLEMS[num].title : ""}`);
+    },
   };
   function launch(kind, arg) {
     lastLaunch = [kind, arg];
@@ -362,6 +394,7 @@
   function renderSheet(unitId) {
     session = null;
     const u = unitById(unitId);
+    if (u.track === "blind75") { renderProblems(u); return; }
     app.innerHTML = `
       <section class="sheet">
         <div class="row between">
@@ -370,16 +403,52 @@
         </div>
         <h1>${u.icon} ${esc(u.title)} — cheat sheet</h1>
         <p class="muted">${esc(u.desc)} Reading is good; recalling is better — practice after skimming.</p>
-        ${u.cards.map((c) => {
-          const p = prog(c.id);
-          const badge = !p ? "" : isMastered(c.id) ? '<span class="pill ok">mastered</span>' : '<span class="pill">learning</span>';
-          return `
+        ${u.cards.map(sheetCard).join("")}
+      </section>`;
+  }
+
+  function sheetCard(c) {
+    const p = prog(c.id);
+    const badge = !p ? "" : isMastered(c.id) ? '<span class="pill ok">mastered</span>' : '<span class="pill">learning</span>';
+    return `
           <details class="sheet-card">
             <summary>${fmt(c.q)} ${badge}</summary>
-            ${c.c ? `<pre class="code"><code>${esc(c.c)}</code></pre>` : ""}
+            ${c.c ? `<pre class="code"><code>${codeHtml(c.c)}</code></pre>` : ""}
             <p class="sheet-answer">${fmt(c.o ? c.o[0] : c.a)}</p>
             ${c.e ? `<p class="muted">${fmt(c.e)}</p>` : ""}
           </details>`;
+  }
+
+  function renderProblems(u) {
+    const nums = [...new Set(u.cards.map((c) => c.p))];
+    app.innerHTML = `
+      <section class="sheet">
+        <div class="row between">
+          <button class="btn ghost" data-act="home">← Back</button>
+          <button class="btn primary" data-act="unit" data-unit="${u.id}">Practice this unit</button>
+        </div>
+        <h1>${u.icon} Blind 75: ${esc(u.title)}</h1>
+        <p class="muted">Practice the cards for a problem, then solve it on LeetCode without notes and tick it off. Expand a card to see its answer.</p>
+        ${nums.map((n) => {
+          const pr = PROBLEMS[n] || { title: "", diff: "" };
+          const cards = u.cards.filter((c) => c.p === n);
+          const mastered = cards.filter((c) => isMastered(c.id)).length;
+          return `
+          <article class="problem ${S.solved[n] ? "is-solved" : ""}">
+            <div class="problem-head">
+              <label class="solved" title="Mark as solved on LeetCode">
+                <input type="checkbox" id="solved-${n}" data-solved="${n}" ${S.solved[n] ? "checked" : ""}>
+                <span>Solved</span>
+              </label>
+              <div class="problem-title">
+                ${problemLink(n)}
+                <span class="pill diff-${pr.diff.toLowerCase()}">${pr.diff}</span>${pr.premium ? '<span class="pill">Premium</span>' : ""}
+                <span class="small muted">${mastered}/${cards.length} cards mastered</span>
+              </div>
+              <button class="btn small" data-act="problem" data-p="${n}">Practice</button>
+            </div>
+            ${cards.map(sheetCard).join("")}
+          </article>`;
         }).join("")}
       </section>`;
   }
@@ -398,6 +467,7 @@
           <div><b>${S.xp}</b><span>total XP</span></div>
           <div><b>${S.best}</b><span>best streak</span></div>
           <div><b>${activeDays}</b><span>active days</span></div>
+          ${B75_NUMS.length ? `<div><b>${solvedCount()}/${B75_NUMS.length}</b><span>Blind 75 solved</span></div>` : ""}
           <div><b>${answered ? Math.round((right / answered) * 100) : 0}%</b><span>accuracy (${answered} answers)</span></div>
         </div>
         ${renderHeatmap()}
@@ -513,6 +583,7 @@
       case "settings": renderSettings(); break;
       case "unit": launch("unit", el.dataset.unit); break;
       case "review": case "mixed": case "mistakes": launch(act); break;
+      case "problem": launch("problem", el.dataset.p); break;
       case "sheet": renderSheet(el.dataset.unit); window.scrollTo(0, 0); break;
       case "pick": pick(+el.dataset.i); break;
       case "check": check(); break;
@@ -549,6 +620,15 @@
     } else if (session.state === "answered" && (k === "Enter" || k === " ")) {
       ev.preventDefault(); next();
     }
+  });
+
+  document.addEventListener("change", (ev) => {
+    const el = ev.target;
+    if (!el.matches || !el.matches("[data-solved]")) return;
+    const n = el.dataset.solved;
+    if (el.checked) S.solved[n] = dayKey(); else delete S.solved[n];
+    save();
+    el.closest(".problem").classList.toggle("is-solved", el.checked);
   });
 
   // Keep multiple tabs in sync.

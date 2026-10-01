@@ -3,11 +3,16 @@
 Bite-sized quizzes and flashcards for coding-interview patterns and time complexity.
 It's one static page with no build step, no backend and no account. All progress lives in your browser's `localStorage`.
 
-**200+ cards in 16 units:** Big-O analysis, Arrays & Hashing, Two Pointers, Sliding Window, Stack, Binary Search,
+**369 cards in 23 units.** The **Foundations** track has 204 cards in 16 units: Big-O analysis, Arrays & Hashing, Two Pointers, Sliding Window, Stack, Binary Search,
 Linked Lists, Trees, Heaps, Backtracking, Graphs, Dynamic Programming, Greedy & Intervals, Tries/Bits/Math,
 Sorting, and an Interview Playbook.
 
-Cards come in two kinds:
+The **Blind 75** track has 165 cards for the 55 Medium and Hard problems on the Blind 75 list (the Easy ones are left out). Each problem has a LeetCode link, a "Solved" checkbox, and three cards:
+- **Approach**: which technique, and why
+- **Missing line**: pick the line that completes a Python solution
+- **Trap or complexity**: the bug or wrong idea that fails hidden tests, or the Big-O you must state
+
+Foundations cards come in two kinds:
 - **"Which tool?"**: *"Find the top K frequent elements. What do you use?"* → hash map + bucket sort / size-k heap
 - **"What's the complexity?"**: read a code snippet and pick its Big-O
 
@@ -37,6 +42,8 @@ Edit [`js/cards.js`](js/cards.js):
 { id: "ah100", q: "Front", a: "Back" }
 ```
 Options are shuffled when shown. Keep `id`s stable, because progress is keyed by id.
+
+Every Blind 75 code card is tested: `python3 tests/check_snippets.py` (needs `node`) runs each snippet and checks that the correct option passes and every wrong option fails.
 
 ## Suggested study plan
 1. **Every day (15–20 min):** clear *Review due* first, then do one new lesson. Protect the streak.

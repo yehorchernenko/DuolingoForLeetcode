@@ -240,3 +240,23 @@ textarea {
 }
 :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- Blind 75 ---------- */
+.track-head { margin: 32px 0 12px; }
+.track-head h2 { font-size: 1.35rem; }
+.lc-link { color: var(--blue); text-decoration: none; font-weight: 600; }
+.lc-link:hover { text-decoration: underline; }
+.problem {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 14px; margin: 12px 0; display: grid; gap: 6px;
+}
+.problem.is-solved { border-color: var(--accent-bg); }
+.problem .sheet-card { margin: 0; background: var(--bg); }
+.problem-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.problem-title { flex: 1; min-width: 200px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.problem-title .pill { margin-left: 0; }
+.solved { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; cursor: pointer; font-size: .9rem; }
+.solved input { width: 18px; height: 18px; accent-color: var(--accent-bg); }
+.pill.diff-medium { background: color-mix(in srgb, #e08a00 18%, var(--surface)); color: #b86f00; }
+.pill.diff-hard { background: var(--bad-bg); color: var(--bad); }
+.code .blank { color: #ffd166; background: color-mix(in srgb, #ffd166 18%, transparent); border-radius: 4px; font-weight: 700; }
